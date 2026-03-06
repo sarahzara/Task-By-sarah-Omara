@@ -98,6 +98,7 @@ public class SaveSystemUserPage {
     public SaveSystemUserPage clickSaveButton() {
         ElementActions.click(saveButton, "Save button");
         WaitManager.waitForElementVisible(successToast, config.getExplicitWaitTimeout());
+        BrowserActions.waitForPageLoad();
         LogManager.info("Save confirmed — success toast is visible");
         return this;
     }
@@ -138,34 +139,41 @@ public class SaveSystemUserPage {
 
     @Step("Step 12: Delete the new user - Username: {userToDelete}")
     public SaveSystemUserPage deleteUser(String userToDelete){
+        countBeforeDeletion = extractRecordCount();
+        LogManager.info("Captured record count before deletion: {}", countBeforeDeletion);
+        Allure.parameter("Record Count - Before Deletion", String.valueOf(countBeforeDeletion));
         Allure.parameter("User Deleted", userToDelete);
+
         ElementActions.click(deleteButtonForUsername(userToDelete), "Delete button for user: " + userToDelete);
         ElementActions.click(yesButton_Delete, "Confirm Delete - Yes, Delete button");
         WaitManager.waitForElementVisible(successToast, config.getExplicitWaitTimeout());
         return this;
     }
 
-    @Step("Step 13: Verify that the number of records decreased by 1")
-    public SaveSystemUserPage verifyRecordCountDecreasedByOne() {
-        int countAfterDeletion = extractRecordCount();
-        int expectedCount = countBeforeDeletion - 1;
-        
-        Allure.parameter("Record Count - Before Deletion", String.valueOf(countBeforeDeletion));
-        Allure.parameter("Record Count - After Deletion", String.valueOf(countAfterDeletion));
-        Allure.parameter("Record Count - Expected After Deletion", String.valueOf(expectedCount));
-        
-        Assert.assertEquals(countAfterDeletion, expectedCount,
-                String.format("❌ Record count did not decrease by 1 after deleting user. Before=%d, After=%d, Expected=%d",
-                        countBeforeDeletion, countAfterDeletion, expectedCount));
-
-        LogManager.info("✅ Record count decreased correctly: {} → {}", countBeforeDeletion, countAfterDeletion);
-        return this;
-    }
 
 
     public SaveSystemUserPage resetUserRecord(){
         ElementActions.click(resetButton, "Reset button");
         BrowserActions.waitForPageLoad();
+        return this;
+    }
+
+    @Step("Step 13: Verify that the number of records decreased by 1")
+    public SaveSystemUserPage verifyRecordCountDecreasedByOne() {
+        int countAfterDeletion = extractRecordCount();
+        int expectedCount = countAfterAddition - 1;
+
+        Allure.parameter("Record Count - Before Adding User",   String.valueOf(initialRecordCount));
+        Allure.parameter("Record Count - After Adding User",    String.valueOf(countAfterAddition));
+        Allure.parameter("Record Count - After Deletion",       String.valueOf(countAfterDeletion));
+        Allure.parameter("Record Count - Expected After Deletion", String.valueOf(expectedCount));
+
+        Assert.assertEquals(countAfterDeletion, expectedCount,
+                String.format("❌ Record count did not decrease by 1 after deleting user. " +
+                                "AfterAdd=%d, AfterDelete=%d, Expected=%d",
+                        countAfterAddition, countAfterDeletion, expectedCount));
+
+        LogManager.info("✅ Record count decreased correctly: {} → {}", countAfterAddition, countAfterDeletion);
         return this;
     }
 
