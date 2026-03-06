@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE suite SYSTEM "http://testng.org/testng-1.0.dtd">
+<suite name="OrangeHRM Test Suite"
+       parallel="tests"
+       thread-count="2"
+       verbose="1">
+
+    <listeners>
+        <listener class-name="io.qameta.allure.testng.AllureTestNg"/>
+        <listener class-name="org.utilities.listener.AllureListener"/>
+    </listeners>
+
+    <test name="UI Tests"
+          parallel="methods"
+          thread-count="3">
+        <classes>
+            <class name="TestCases.ui.TestCases"/>
+        </classes>
+    </test>
+
+    <test name="API Tests"
+          parallel="none">
+        <classes>
+            <class name="TestCases.api.ApiTest"/>
+        </classes>
+    </test>
+
+</suite>

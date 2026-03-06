@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN" monitorInterval="30">
+    <Appenders>
+        <!-- Console Appender -->
+        <Console name="Console" target="SYSTEM_OUT">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </Console>
+
+        <!-- Test Execution File - All levels including errors -->
+        <File name="TestExecutionAppender" fileName="logs/test-execution.log" append="true">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </File>
+
+        <!-- Framework File - All levels including errors -->
+        <File name="FrameworkAppender" fileName="logs/framework.log" append="true">
+            <PatternLayout pattern="%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} - %msg%n"/>
+        </File>
+
+    </Appenders>
+
+    <Loggers>
+
+        <!-- Test Cases Logger - All levels go to test file -->
+        <Logger name="AUTOMATION TEST CASES" level="INFO" additivity="false">
+            <AppenderRef ref="TestExecutionAppender"/>
+            <AppenderRef ref="Console"/>
+        </Logger>
+
+        <!-- Framework Logger - All levels go to framework file -->
+        <Logger name="AUTOMATION FRAMEWORK" level="INFO" additivity="false">
+            <AppenderRef ref="FrameworkAppender"/>
+            <AppenderRef ref="Console"/>
+        </Logger>
+
+        <!-- Selenium Logger -->
+        <Logger name="org.openqa.selenium" level="WARN" additivity="false">
+            <AppenderRef ref="Console"/>
+        </Logger>
+
+        <!-- Root Logger -->
+        <Root level="WARN">
+            <AppenderRef ref="Console"/>
+        </Root>
+
+    </Loggers>
+</Configuration>

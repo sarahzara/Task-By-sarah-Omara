@@ -1,0 +1,580 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.example</groupId>
+    <artifactId>Task-Assessment</artifactId>
+    <version>1.0-SNAPSHOT</version>
+
+    <!--
+    ══════════════════════════════════════════════════════════════════
+    WHAT'S NEW vs. YOUR ORIGINAL POM
+    ══════════════════════════════════════════════════════════════════
+
+    NEW dependencies added for the REST Assured API framework:
+
+      1. allure-rest-assured
+         → Attaches full HTTP request + response to Allure report
+         → Used by AllureRestAssured filter in RequestSpecBuilder
+         → FEATURE 7: First-Class Logging
+
+      2. rest-assured scope changed: test → compile
+         → org.api.* classes live in src/main, so they need
+           REST Assured at compile time, not just test time
+
+      3. json-path (explicit)
+         → FEATURE 2: Built-In JSON Parsing
+         → Bundled with REST Assured but declared for IDE clarity
+
+      4. json-schema-validator
+         → FEATURE 8: full JSON schema contract validation
+         → .body(matchesJsonSchemaInClasspath("schemas/candidate.json"))
+
+      5. hamcrest (explicit)
+         → FEATURE 3: Body Matchers + CustomMatchers.java
+         → Bundled with REST Assured but declared for version pinning
+
+    NEW profiles:
+
+      -Papi          → runs API tests only     (api_testng.xml)
+      -Pui           → runs UI tests only      (parallel_Testng.xml)
+      -Pall          → runs both suites
+      -Pallure-serve → same as before, auto-opens Allure report
+      -Pqa           → active by default
+      -Pprod         → production / smoke runs
+
+    COMMANDS:
+      mvn clean test -Papi                   → API tests only (no browser)
+      mvn clean test -Pui                    → UI/Selenium tests only
+      mvn clean test -Pall                   → full regression
+      mvn clean test -Papi,allure-serve      → API + open Allure report
+      mvn clean test -Papi -Denvironment=prod → API on prod config
+    ══════════════════════════════════════════════════════════════════
+    -->
+
+    <properties>
+        <!-- ── Java ──────────────────────────────────────────────────── -->
+        <maven.compiler.source>17</maven.compiler.source>
+        <maven.compiler.target>17</maven.compiler.target>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+
+        <!-- ── UI / Selenium ─────────────────────────────────────────── -->
+        <selenium.version>4.15.0</selenium.version>
+        <webdrivermanager.version>5.5.3</webdrivermanager.version>
+
+        <!-- ── Test Frameworks ───────────────────────────────────────── -->
+        <testng.version>7.8.0</testng.version>
+        <cucumber.version>7.14.0</cucumber.version>
+
+        <!-- ── REST Assured ──────────────────────────────────────────── -->
+        <!--
+            5.3.2 bundles: json-path, xml-path, hamcrest 2.x, groovy
+            All transitively included — listed below for IDE clarity.
+        -->
+        <restassured.version>5.3.2</restassured.version>
+
+        <!-- ── Allure Reporting ──────────────────────────────────────── -->
+        <allure.version>2.24.0</allure.version>
+        <allure.maven.version>2.12.0</allure.maven.version>
+        <aspectj.version>1.9.20.1</aspectj.version>
+
+        <!-- ── Logging ───────────────────────────────────────────────── -->
+        <log4j.version>2.20.0</log4j.version>
+
+        <!-- ── Utilities ─────────────────────────────────────────────── -->
+        <jackson.version>2.15.2</jackson.version>
+        <apache.poi.version>5.2.4</apache.poi.version>
+        <hamcrest.version>2.2</hamcrest.version>
+
+        <!-- ── Build Plugins ─────────────────────────────────────────── -->
+        <maven.surefire.version>3.1.2</maven.surefire.version>
+        <maven.compiler.version>3.11.0</maven.compiler.version>
+
+        <!-- ── Default Execution Properties ─────────────────────────── -->
+        <!-- All overridable at CLI: mvn test -Pbrowser=firefox          -->
+        <suite.file>parallel_Testng.xml</suite.file>
+        <browser>chrome</browser>
+        <environment>qa</environment>
+        <parallel.threads>5</parallel.threads>
+    </properties>
+
+    <dependencies>
+
+        <!-- ══════════════════════════════════════════════════════════
+             UI TESTING — Selenium WebDriver
+             ══════════════════════════════════════════════════════════ -->
+
+        <dependency>
+            <groupId>org.seleniumhq.selenium</groupId>
+            <artifactId>selenium-java</artifactId>
+            <version>${selenium.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.github.bonigarcia</groupId>
+            <artifactId>webdrivermanager</artifactId>
+            <version>${webdrivermanager.version}</version>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════
+             TEST FRAMEWORK — TestNG + Cucumber
+             ══════════════════════════════════════════════════════════ -->
+
+        <dependency>
+            <groupId>org.testng</groupId>
+            <artifactId>testng</artifactId>
+            <version>${testng.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-java</artifactId>
+            <version>${cucumber.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.cucumber</groupId>
+            <artifactId>cucumber-testng</artifactId>
+            <version>${cucumber.version}</version>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════
+             API TESTING — REST Assured  (FEATURES 1–10)
+             ══════════════════════════════════════════════════════════ -->
+
+        <!--
+            SCOPE: compile  (changed from test in your original pom)
+            ─────────────────────────────────────────────────────────
+            WHY: The framework classes live in src/main/java/org/api/*
+              (RequestSpecBuilder, CandidateApiClient, AuthUtils, etc.)
+            Maven's test scope makes a dependency available ONLY inside
+            src/test. Compile scope makes it available everywhere.
+            All test classes in src/test inherit compile-scoped deps.
+        -->
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>rest-assured</artifactId>
+            <version>${restassured.version}</version>
+            <!--
+                What this single dependency provides:
+                FEATURE 1: given().when().then() fluent DSL
+                FEATURE 2: built-in JSON/XML parsing (json-path bundled)
+                FEATURE 3: Hamcrest body matcher integration
+                FEATURE 5: RequestSpecBuilder, ResponseSpecBuilder
+                FEATURE 6: .auth().basic(), .auth().oauth2(), cookie support
+                FEATURE 9: TestNG / JUnit compatible out of the box
+            -->
+        </dependency>
+
+        <!--
+            allure-rest-assured  ← NEW for API framework
+            ─────────────────────────────────────────────
+            FEATURE 7: First-Class Logging & Debug Control
+            Adds the AllureRestAssured filter used in RequestSpecBuilder:
+              .addFilter(new AllureRestAssured())
+            Effect: every API call in the Allure report shows:
+              ► Request:  POST /api/v2/recruitment/candidates
+                          Body: { "firstName": "Jane", ... }
+              ► Response: 200 OK
+                          Body: { "data": { "id": 47, ... } }
+            Without this, Allure shows @Step names but NO HTTP details.
+        -->
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-rest-assured</artifactId>
+            <version>${allure.version}</version>
+        </dependency>
+
+        <!--
+            json-path  ← declared explicitly (bundled with rest-assured)
+            ─────────────────────────────────────────────────────────────
+            FEATURE 2: Built-In JSON & XML Parsing
+            Declaring it explicitly:
+              1. Gives full IDE autocompletion on JsonPath methods
+              2. Pins the version — no surprise transitive upgrades
+            Used in tests to STORE values (not assert):
+              int id    = response.jsonPath().getInt("data.id");
+              String tok = response.jsonPath().getString("token");
+        -->
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>json-path</artifactId>
+            <version>${restassured.version}</version>
+        </dependency>
+
+        <!--
+            json-schema-validator  ← NEW for API framework
+            ──────────────────────────────────────────────
+            FEATURE 8: Validation at HTTP + Business Level — Schema validation
+            Validates the ENTIRE response structure against a JSON Schema file.
+            Stronger than individual field assertions for contract testing.
+
+            Usage in tests:
+              .then()
+                .body(matchesJsonSchemaInClasspath("schemas/candidate-response.json"))
+
+            Place schema files in: src/test/resources/schemas/
+            Example schema (candidate-response.json):
+            {
+              "type": "object",
+              "required": ["data", "meta"],
+              "properties": {
+                "data": {
+                  "type": "object",
+                  "required": ["id", "firstName", "lastName", "email"],
+                  "properties": {
+                    "id":        { "type": "integer", "minimum": 1 },
+                    "firstName": { "type": "string",  "minLength": 1 },
+                    "email":     { "type": "string",  "format": "email" }
+                  }
+                }
+              }
+            }
+        -->
+        <dependency>
+            <groupId>io.rest-assured</groupId>
+            <artifactId>json-schema-validator</artifactId>
+            <version>${restassured.version}</version>
+        </dependency>
+
+        <!--
+            Hamcrest  ← declared explicitly (bundled with rest-assured)
+            ─────────────────────────────────────────────────────────────
+            FEATURE 3: Body Matchers (not JsonPath assertions)
+            Used in:
+              • ResponseAssertions.java  — greaterThan(0), notNullValue(), hasKey()
+              • CustomMatchers.java      — TypeSafeMatcher base class
+              • CandidateTests.java      — equalTo(), hasItem(), not(), allOf()
+            Declaring it pins version 2.2 and gives full IDE support for
+            the entire Matchers.* static import.
+        -->
+        <dependency>
+            <groupId>org.hamcrest</groupId>
+            <artifactId>hamcrest</artifactId>
+            <version>${hamcrest.version}</version>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════
+             ALLURE REPORTING
+             ══════════════════════════════════════════════════════════ -->
+
+        <!--
+            allure-testng: @Epic, @Feature, @Story, @Severity on TestNG tests.
+            allure-java-commons: @Step, Allure.parameter(), Allure.addAttachment()
+            allure-cucumber7-jvm: Allure integration for Cucumber scenarios.
+            allure-rest-assured: HTTP request/response in Allure (declared above).
+        -->
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-testng</artifactId>
+            <version>${allure.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-cucumber7-jvm</artifactId>
+            <version>${allure.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>io.qameta.allure</groupId>
+            <artifactId>allure-java-commons</artifactId>
+            <version>${allure.version}</version>
+        </dependency>
+
+        <!--
+            aspectjweaver — REQUIRED for @Step to fire at runtime
+            ──────────────────────────────────────────────────────
+            AspectJ intercepts @Step-annotated method calls and reports
+            them to Allure. Without the -javaagent in surefire argLine,
+            @Step annotations compile fine but do absolutely nothing at runtime.
+            Scope: runtime (not needed to compile, only to run).
+        -->
+        <dependency>
+            <groupId>org.aspectj</groupId>
+            <artifactId>aspectjweaver</artifactId>
+            <version>${aspectj.version}</version>
+            <scope>runtime</scope>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════
+             LOGGING — Log4J2
+             ══════════════════════════════════════════════════════════ -->
+
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-core</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.logging.log4j</groupId>
+            <artifactId>log4j-api</artifactId>
+            <version>${log4j.version}</version>
+        </dependency>
+
+        <!-- ══════════════════════════════════════════════════════════
+             UTILITIES
+             ══════════════════════════════════════════════════════════ -->
+
+        <!--
+            Jackson — FEATURE 4: POJO Serialization / Deserialization
+            ──────────────────────────────────────────────────────────
+            REST Assured uses Jackson automatically when it's on the classpath:
+              Serialization:   given().body(candidateModel)
+                               → Jackson converts CandidateModel → JSON string
+              Deserialization: response.as(CandidateModel.class)
+                               → Jackson parses JSON response → typed object
+            Also used by ConfigReader.java for testData.json parsing.
+        -->
+        <dependency>
+            <groupId>com.fasterxml.jackson.core</groupId>
+            <artifactId>jackson-databind</artifactId>
+            <version>${jackson.version}</version>
+        </dependency>
+
+        <!-- Apache POI — reads testdata.xlsx (from the framework image) -->
+        <dependency>
+            <groupId>org.apache.poi</groupId>
+            <artifactId>poi-ooxml</artifactId>
+            <version>${apache.poi.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.projectlombok</groupId>
+            <artifactId>lombok</artifactId>
+            <version>1.18.38</version>
+            <scope>provided</scope>
+        </dependency>
+
+    </dependencies>
+
+    <build>
+        <plugins>
+
+            <!-- ── Maven Compiler ────────────────────────────────────── -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>${maven.compiler.version}</version>
+                <configuration>
+                    <source>${maven.compiler.source}</source>
+                    <target>${maven.compiler.target}</target>
+                    <annotationProcessorPaths>
+                        <path>
+                            <groupId>org.aspectj</groupId>
+                            <artifactId>aspectjweaver</artifactId>
+                            <version>${aspectj.version}</version>
+                        </path>
+                    </annotationProcessorPaths>
+                </configuration>
+            </plugin>
+
+            <!-- ── Maven Surefire ────────────────────────────────────── -->
+            <!--
+                Default config — used when no profile overrides <suiteXmlFiles>.
+                Runs ${suite.file} which defaults to parallel_Testng.xml.
+                Profiles below override this per test type.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-surefire-plugin</artifactId>
+                <version>${maven.surefire.version}</version>
+                <configuration>
+                    <suiteXmlFiles>
+                        <suiteXmlFile>${suite.file}</suiteXmlFile>
+                    </suiteXmlFiles>
+                    <parallel>methods</parallel>
+                    <threadCount>${parallel.threads}</threadCount>
+
+                    <!--
+                        AspectJ javaagent — MUST be a JVM -javaagent argument.
+                        This is what makes @Step annotations actually work at runtime.
+                        If you remove this line, @Step compiles fine but does nothing.
+                    -->
+                    <argLine>
+                        -javaagent:"${settings.localRepository}/org/aspectj/aspectjweaver/${aspectj.version}/aspectjweaver-${aspectj.version}.jar"
+                    </argLine>
+
+                    <systemPropertyVariables>
+                        <browser>${browser}</browser>
+                        <environment>${environment}</environment>
+                        <allure.results.directory>${project.build.directory}/allure-results</allure.results.directory>
+                        <allure.report.directory>${project.build.directory}/allure-report</allure.report.directory>
+                    </systemPropertyVariables>
+
+                    <properties>
+                        <property>
+                            <n>usedefaultlisteners</n>
+                            <value>false</value>
+                        </property>
+                        <property>
+                            <n>listener</n>
+                            <value>io.qameta.allure.testng.AllureTestNg</value>
+                        </property>
+                    </properties>
+                </configuration>
+            </plugin>
+
+            <!-- ── Allure Maven Plugin ───────────────────────────────── -->
+            <plugin>
+                <groupId>io.qameta.allure</groupId>
+                <artifactId>allure-maven</artifactId>
+                <version>${allure.maven.version}</version>
+                <configuration>
+                    <reportVersion>${allure.version}</reportVersion>
+                    <resultsDirectory>${project.build.directory}/allure-results</resultsDirectory>
+                    <reportDirectory>${project.build.directory}/allure-report</reportDirectory>
+                </configuration>
+            </plugin>
+
+        </plugins>
+    </build>
+
+    <!-- ══════════════════════════════════════════════════════════════════
+         PROFILES
+         ══════════════════════════════════════════════════════════════════
+
+         HOW TO USE:
+           mvn clean test -Papi                    API tests only, no browser
+           mvn clean test -Pui                     Selenium tests only
+           mvn clean test -Pall                    Full regression (both suites)
+           mvn clean test -Papi,allure-serve       API tests + open Allure report
+           mvn clean test -Papi -Denvironment=prod API on prod environment
+
+         WHY SEPARATE PROFILES:
+           CI pipeline can run -Papi in ~2 minutes (no browser overhead).
+           -Pall runs on nightly / pre-release builds.
+           Different teams activate what is relevant to them.
+    ══════════════════════════════════════════════════════════════════════ -->
+    <profiles>
+
+        <!-- ── API Tests Only ───────────────────────────────────────── -->
+        <!--
+            Command: mvn clean test -Papi
+            Suite:   api_testng.xml  (create this file in project root)
+            Runs:    CandidateTests + any future API test classes
+            Note:    No browser required — pure HTTP, very fast in CI
+        -->
+        <profile>
+            <id>api</id>
+            <properties>
+                <suite.file>api_testng.xml</suite.file>
+                <!--
+                    3 threads for API parallel execution.
+                    Each thread gets its own login session.
+                    More than 3 can cause session conflicts on OrangeHRM demo.
+                -->
+                <parallel.threads>3</parallel.threads>
+            </properties>
+        </profile>
+
+        <!-- ── UI / Selenium Tests Only ─────────────────────────────── -->
+        <!--
+            Command: mvn clean test -Pui
+            Suite:   parallel_Testng.xml
+            Runs:    All Selenium page object tests
+        -->
+        <profile>
+            <id>ui</id>
+            <properties>
+                <suite.file>parallel_Testng.xml</suite.file>
+                <parallel.threads>5</parallel.threads>
+            </properties>
+        </profile>
+
+        <!-- ── Both Suites (Full Regression) ────────────────────────── -->
+        <!--
+            Command: mvn clean test -Pall
+            Runs API tests first, then UI tests.
+            Use for full regression before a release.
+        -->
+        <profile>
+            <id>all</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.apache.maven.plugins</groupId>
+                        <artifactId>maven-surefire-plugin</artifactId>
+                        <version>${maven.surefire.version}</version>
+                        <configuration>
+                            <suiteXmlFiles>
+                                <suiteXmlFile>api_testng.xml</suiteXmlFile>
+                                <suiteXmlFile>parallel_Testng.xml</suiteXmlFile>
+                            </suiteXmlFiles>
+                        </configuration>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- ── Open Allure Report After Tests ───────────────────────── -->
+        <!--
+            Command (combine with any suite profile):
+              mvn clean test -Papi,allure-serve
+              mvn clean test -Pall,allure-serve
+            Opens browser with Allure report automatically after test run.
+        -->
+        <profile>
+            <id>allure-serve</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>exec-maven-plugin</artifactId>
+                        <version>3.1.0</version>
+                        <executions>
+                            <execution>
+                                <id>open-allure-report</id>
+                                <phase>install</phase>
+                                <goals>
+                                    <goal>exec</goal>
+                                </goals>
+                                <configuration>
+                                    <executable>mvn</executable>
+                                    <arguments>
+                                        <argument>allure:serve</argument>
+                                    </arguments>
+                                </configuration>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+
+        <!-- ── QA Environment (active by default) ───────────────────── -->
+        <!--
+            Loads qa.properties via ConfigReader.
+            Active by default — no need to pass -Pqa explicitly.
+        -->
+        <profile>
+            <id>qa</id>
+            <activation>
+                <activeByDefault>true</activeByDefault>
+            </activation>
+            <properties>
+                <environment>qa</environment>
+                <browser>chrome</browser>
+            </properties>
+        </profile>
+
+        <!-- ── Production / Smoke ────────────────────────────────────── -->
+        <!--
+            Command: mvn clean test -Pprod -Papi
+            Use for smoke tests against production after a deployment.
+            Lower thread count to reduce load on prod server.
+        -->
+        <profile>
+            <id>prod</id>
+            <properties>
+                <environment>prod</environment>
+                <browser>chrome</browser>
+                <parallel.threads>2</parallel.threads>
+            </properties>
+        </profile>
+
+    </profiles>
+
+</project>
